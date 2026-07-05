@@ -8,6 +8,7 @@
 Texture2D Textures_Atlas;
 
 int main() {
+    setvbuf(stdout, NULL, _IONBF, 0);
 
     float dt = 0.016f;
     struct CameraImpl camera = {0.0, 0.0, CHUNK_SIZE * 2};
@@ -20,7 +21,6 @@ int main() {
     Textures_Atlas = LoadTexture("assets/textures/blocks_texture.png");
     Texture2D cursor_texture = LoadTexture("assets/textures/cursor_texture.png");
     struct World* world = create_world(123);
-
     while (!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(RAYWHITE);
@@ -36,9 +36,9 @@ int main() {
         _Bool key_pressed_e = IsKeyDown(KEY_E);
         float factor = key_pressed_e == key_pressed_q ? 1 : (key_pressed_q ? 0.5f : 2.f);
         camera.zoom *= pow(factor, dt);
-        
+
         render_world(world, camera, screen_center_x, screen_center_y, screen_width, screen_height);
-        
+
         float camera_block_x = camera.x * CHUNK_SIZE;
         float camera_block_y = camera.y * CHUNK_SIZE;
 
@@ -64,17 +64,12 @@ int main() {
             int64_t chunk_x = (int64_t)floor((double)grid_x / CHUNK_SIZE);
             int64_t chunk_y = (int64_t)floor((double)grid_y / CHUNK_SIZE) + 1;
 
-            int64_t array_x = chunk_x + LOADED_WORLD_CENTER_X;
-            int64_t array_y = chunk_y + LOADED_WORLD_CENTER_Y;
-
-            if (array_x >= 0 && array_x < LOADED_WORLD_WIDTH && array_y >= 0 && array_y < LOADED_WORLD_HEIGHT) {
-                int64_t chunk_idx = array_x * LOADED_WORLD_HEIGHT + array_y;
-                if (world->active_chunks[chunk_idx] != NULL) {
-                    world->active_chunks[chunk_idx]->blocks[block_idx] = DIRT;
-                    BeginTextureMode(world->active_chunks[chunk_idx]->texture);
+            struct Chunk* chunk_ptr = get_chunk((int64_t)chunk_x, (int64_t)chunk_y, world->chunks);
+            if (NULL != chunk_ptr) {
+                    chunk_ptr->blocks[block_idx] = DIRT;
+                    BeginTextureMode(chunk_ptr->texture);
                         DrawTexturePro(Textures_Atlas, (Rectangle){DIRT * 16, 16, 16, -16}, (Rectangle){local_x * 16, local_y * 16, 16, 16}, (Vector2){0, 0}, 0, WHITE);
                     EndTextureMode();
-                }
             }
         }
 

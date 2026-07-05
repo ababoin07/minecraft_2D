@@ -43,10 +43,15 @@ void chunk_generate_caves(struct Chunk* chunk_input) {
                 chunk_input->blocks[x * CHUNK_SIZE + y] = (uint8_t)AIR;
                 continue;
             }
-            noise = fnlGetNoise2D(chunk_input->noise_generator, ((float)x + start_x) / 0.5f, ((float)y + start_y) / 0.5f);
-            if (-0.15f < noise && noise < 0.15f) {
+            noise = fnlGetNoise2D(chunk_input->noise_generator, ((float)x + start_x + 8192.f) / 2.f, ((float)y + start_y) / 2.5f);
+            if (-0.1f < noise && noise < 0.1f) {
                 chunk_input->blocks[x * CHUNK_SIZE + y] = (uint8_t)AIR;
-                continue;                
+                continue;
+            }
+            noise = fnlGetNoise2D(chunk_input->noise_generator, ((float)x + start_x - 8192.f) * 2.f, ((float)y + start_y) * 2.f);
+            if (-0.05f < noise && noise < 0.1f) {
+                chunk_input->blocks[x * CHUNK_SIZE + y] = (uint8_t)AIR;
+                continue;
             }
         }
     }
@@ -63,24 +68,28 @@ struct World* create_world(int seed) {
     ptr->noise_generator = fnlCreateState();
     ptr->noise_generator.seed = seed;
     ptr->noise_generator.noise_type = FNL_NOISE_OPENSIMPLEX2;
-    ptr->offset_x = 0;
-    ptr->offset_y = 0;
-    for (int64_t x = 0; x < LOADED_WORLD_WIDTH; x++) {
-        for (int64_t y = 0; y < LOADED_WORLD_HEIGHT; y++) {
-            ptr->active_chunks[x * LOADED_WORLD_HEIGHT + y] = create_chunk(x - LOADED_WORLD_CENTER_X + ptr->offset_x, y - LOADED_WORLD_CENTER_Y + ptr->offset_y, &ptr->noise_generator);
-            chunk_generate_base(ptr->active_chunks[x * LOADED_WORLD_HEIGHT + y]);
-            chunk_generate_caves(ptr->active_chunks[x * LOADED_WORLD_HEIGHT + y]);
-            generate_chunk_texture_render(ptr->active_chunks[x * LOADED_WORLD_HEIGHT + y]);
-            // generate_until(ptr->active_chunks[x * LOADED_WORLD_HEIGHT + y], CHUNK_GEN_BASE);
+    ptr->chunks = create_hash_table();
+    
+    for (int64_t x = -HALF_INITIAL_WORLD_SIZE; x < HALF_INITIAL_WORLD_SIZE; x++) {
+        for (int64_t y = -HALF_INITIAL_WORLD_SIZE; y < HALF_INITIAL_WORLD_SIZE; y++) {
+            struct Chunk* chunk = create_chunk(x, y, &ptr->noise_generator);
+            store_chunk(chunk, ptr->chunks);
+            
+            chunk_generate_base(chunk);
+            chunk_generate_caves(chunk);
+            generate_chunk_texture_render(chunk);
         }
     }
     return ptr;
 }
 
 void destroy_world(struct World* world_input) {
-    for (size_t tmp = 0; tmp < LOADED_WORLD_WIDTH * LOADED_WORLD_HEIGHT; tmp++) {
-        destroy_chunk(world_input->active_chunks[tmp]);
+    for (size_t tmp = 0; tmp < HASH_TABLE_BUCKETS * HASH_TABLE_BUCKET_SIZE; tmp++) {
+        if (world_input->chunks->buckets[tmp].chunk_ptr != NULL) {
+            destroy_chunk(world_input->chunks->buckets[tmp].chunk_ptr);
+        }
     }
+    free(world_input->chunks);
     free(world_input);
     printf("INFO: WORLD: Destroyed World from RAM\n");
 }

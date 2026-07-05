@@ -6,20 +6,16 @@
 
 struct HashTableSlot {
     double age;
-    int64_t x, y;
     struct Chunk* chunk_ptr;
 };
 
-struct HashTableBucket {
-    int free_buckets;
-    struct HashTableSlot slots[HASH_TABLE_BUCKET_SIZE];
-};
-
 struct HashTable {
-    struct HashTableBucket buckets[HASH_TABLE_BUCKETS];
+    struct HashTableSlot buckets[HASH_TABLE_BUCKETS * HASH_TABLE_BUCKET_SIZE];
 };
 
 struct HashTable* create_hash_table();
 int hash_pair(int64_t, int64_t);
+void store_chunk(struct Chunk*, struct HashTable*);
+struct Chunk* get_chunk(int64_t, int64_t, struct HashTable*);
 
 #endif // HASH_TABLE_H

@@ -44,21 +44,46 @@ void generate_chunk_texture_render(struct Chunk* chunk) {
 }
 
 void render_world(struct World* world, struct CameraImpl camera, int center_x, int center_y, int width, int height) {
-    float chunk_size = CHUNK_SIZE * camera.zoom;
-    size_t chunk_idx = (size_t)-1;
+    float scaled_chunk_size = CHUNK_SIZE * camera.zoom;
+    
+    float half_w = (width / 2.0f) / (camera.zoom * CHUNK_SIZE);
+    float half_h = (height / 2.0f) / (camera.zoom * CHUNK_SIZE);
+
+    int64_t min_x = (int64_t)floorf(camera.x - half_w);
+    int64_t max_x = (int64_t)ceilf(camera.x + half_w);
+    int64_t min_y = (int64_t)floorf(camera.y - half_h);
+    int64_t max_y = (int64_t)ceilf(camera.y + half_h);
+
     size_t counter_temporary = 0;
-    for (int64_t x = 0; x < LOADED_WORLD_WIDTH; x++) {
-        for (int64_t y = 0; y < LOADED_WORLD_HEIGHT; y++) {
-            chunk_idx++;
-            if (NULL == world->active_chunks[chunk_idx]) continue;
-            float position_x = (world->active_chunks[chunk_idx]->position_x - camera.x) * camera.zoom * CHUNK_SIZE + center_x;
-            float position_y = (camera.y - world->active_chunks[chunk_idx]->position_y) * camera.zoom * CHUNK_SIZE + center_y;
-            if (position_x > center_x + width / 2 || position_y > center_y + height / 2) continue;
-            if (position_x < center_x - width / 2 - chunk_size || position_y < center_y - height / 2 - chunk_size) continue;
-            render_chunk(position_x, position_y, world->active_chunks[chunk_idx], camera.zoom / CHUNK_SIZE);
+
+    for (int64_t x = min_x; x <= max_x; x++) {
+        for (int64_t y = min_y; y <= max_y; y++) {
+            struct Chunk* chunk = get_chunk(x, y, world->chunks);
+            if (NULL == chunk) {
+                struct Chunk* chunk = create_chunk(x, y, &world->noise_generator);
+                store_chunk(chunk, world->chunks);
+            
+                chunk_generate_base(chunk);
+                chunk_generate_caves(chunk);
+                generate_chunk_texture_render(chunk);
+                continue;
+            }
+
+            float screen_x = (chunk->position_x - camera.x) * camera.zoom * CHUNK_SIZE + center_x;
+            float screen_y = (camera.y - chunk->position_y) * camera.zoom * CHUNK_SIZE + center_y;
+
+            if (screen_x + scaled_chunk_size < center_x - width / 2.0f || 
+                screen_x > center_x + width / 2.0f ||
+                screen_y + scaled_chunk_size < center_y - height / 2.0f || 
+                screen_y > center_y + height / 2.0f) {
+                continue;
+            }
+
+            render_chunk(screen_x, screen_y, chunk, camera.zoom / CHUNK_SIZE);
             ++counter_temporary;
         }
     }
+
     char buffer[64];
     snprintf(buffer, sizeof(buffer), "Drawn chunks: %zu", counter_temporary);
     DrawText(buffer, 0, 0, 40, DARKBLUE);

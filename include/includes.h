@@ -12,5 +12,6 @@
 
 #include "global.h"
 #include "config.h"
+#include "math_utilities.h"
 
 #endif // INCLUDES_H

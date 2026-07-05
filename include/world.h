@@ -3,6 +3,7 @@
 
 #include "includes.h"
 #include "FastNoiseLite.h"
+#include "hash_table.h"
 
 enum ChunkGenSteps {
     CHUNK_GEN_UNSTARTED,
@@ -24,9 +25,8 @@ struct Chunk {
 
 struct World {
     int seed;
-    int64_t offset_x, offset_y;
     fnl_state noise_generator;
-    struct Chunk* active_chunks[LOADED_WORLD_WIDTH * LOADED_WORLD_HEIGHT];
+    struct HashTable* chunks;
 };
 
 struct Chunk* create_chunk(int64_t, int64_t, fnl_state*);
