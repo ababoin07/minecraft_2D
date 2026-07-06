@@ -4,23 +4,31 @@
 #include "world.h"
 #include "camera.h"
 #include "render.h"
+#include "fifo.h"
 
 Texture2D Textures_Atlas;
+struct FifoWorldGen* fifo_world_gen;
+uint32_t Chunks_Amount;
 
 int main() {
-    setvbuf(stdout, NULL, _IONBF, 0);
-
     float dt = 0.016f;
     struct CameraImpl camera = {0.0, 0.0, CHUNK_SIZE * 2};
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
 
+    SetTraceLogLevel(LOG_WARNING);
+
     InitWindow(800, 600, "Minecraft 2D");
     SetWindowMinSize(800, 600);
 
     Textures_Atlas = LoadTexture("assets/textures/blocks_texture.png");
+    fifo_world_gen = FIFO_world_gen_create();
     Texture2D cursor_texture = LoadTexture("assets/textures/cursor_texture.png");
-    struct World* world = create_world(123);
+
+    Chunks_Amount = 0;
+
+    struct World* world = create_world(42);
+
     while (!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(RAYWHITE);
@@ -36,6 +44,7 @@ int main() {
         _Bool key_pressed_e = IsKeyDown(KEY_E);
         float factor = key_pressed_e == key_pressed_q ? 1 : (key_pressed_q ? 0.5f : 2.f);
         camera.zoom *= pow(factor, dt);
+        camera.zoom = CLAMP(camera.zoom, 2.0, 80.0);
 
         render_world(world, camera, screen_center_x, screen_center_y, screen_width, screen_height);
 
@@ -73,19 +82,13 @@ int main() {
             }
         }
 
-        if (IsKeyPressed(KEY_ONE)) printf("(%f, %f);\n", grid_x, grid_y);
-
-        if (IsKeyPressed(KEY_SPACE)) {
-            
-        }
-
         DrawTexturePro(cursor_texture, (Rectangle){0, 0, 16, 16}, (Rectangle){draw_x, draw_y, camera.zoom, camera.zoom}, (Vector2){0, 0}, 0, WHITE);
         EndDrawing();
+        eat_fifo(fifo_world_gen, world, 8);
         dt = GetFrameTime();
     }
 
     destroy_world(world);
-    world = NULL;
 
     UnloadTexture(Textures_Atlas);
     CloseWindow(); 

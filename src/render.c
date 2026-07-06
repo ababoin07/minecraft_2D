@@ -1,6 +1,7 @@
 #include "includes.h"
 #include "world.h"
 #include "camera.h"
+#include "fifo.h"
 
 #include "render.h"
 
@@ -60,12 +61,7 @@ void render_world(struct World* world, struct CameraImpl camera, int center_x, i
         for (int64_t y = min_y; y <= max_y; y++) {
             struct Chunk* chunk = get_chunk(x, y, world->chunks);
             if (NULL == chunk) {
-                struct Chunk* chunk = create_chunk(x, y, &world->noise_generator);
-                store_chunk(chunk, world->chunks);
-            
-                chunk_generate_base(chunk);
-                chunk_generate_caves(chunk);
-                generate_chunk_texture_render(chunk);
+                request_gen(x, y, fifo_world_gen);
                 continue;
             }
 
@@ -86,6 +82,12 @@ void render_world(struct World* world, struct CameraImpl camera, int center_x, i
 
     char buffer[64];
     snprintf(buffer, sizeof(buffer), "Drawn chunks: %zu", counter_temporary);
-    DrawText(buffer, 0, 0, 40, DARKBLUE);
-    DrawFPS(0, 45);
-}
+    DrawText(buffer, 0, 0, 20, DARKBLUE);
+    DrawFPS(0, 25);
+    int amount = fifo_world_gen->end - fifo_world_gen->start;
+    if (amount < 0) amount += FIFO_WORLD_GEN_SIZE;
+    snprintf(buffer, sizeof(buffer), "Waiting chunks amount: %i", amount);
+    DrawText(buffer, 0, 50, 20, BLUE);
+    snprintf(buffer, sizeof(buffer), "Chunks amount: %" PRIu32, Chunks_Amount);
+    DrawText(buffer, 0, 75, 20, RED);
+} 

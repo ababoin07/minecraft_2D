@@ -4,6 +4,7 @@
 #include "data.h"
 #include "FastNoiseLite.h"
 #include "render.h"
+#include "fifo.h"
 
 struct Chunk* create_chunk(int64_t offset_x, int64_t offset_y, fnl_state* noise_generator) {
     struct Chunk* ptr = malloc(sizeof(struct Chunk));
@@ -16,6 +17,7 @@ struct Chunk* create_chunk(int64_t offset_x, int64_t offset_y, fnl_state* noise_
     ptr->generation = CHUNK_GEN_UNSTARTED;
     ptr->noise_generator = noise_generator;
     generate_chunk_texture_render(ptr);
+    ++Chunks_Amount;
     return ptr;
 };
 
@@ -25,7 +27,7 @@ void chunk_generate_base(struct Chunk* chunk_input) {
         int height_noise = (int)(16 * fnlGetNoise2D(chunk_input->noise_generator, (float)chunk_input->position_x * (float)CHUNK_SIZE + (float)x, 32768.f));
         int height = CHUNK_SIZE * chunk_input->position_y;
         for (int y = 0; y < CHUNK_SIZE; y++) {
-            chunk_input->blocks[x * CHUNK_SIZE + y] = (uint8_t)(height > height_noise? AIR: (height == height_noise? GRASS: STONE));
+            chunk_input->blocks[x * CHUNK_SIZE + y] = (uint8_t)(height >= height_noise? AIR: STONE);
             ++height;
         }
     }
@@ -34,10 +36,11 @@ void chunk_generate_base(struct Chunk* chunk_input) {
 void chunk_generate_caves(struct Chunk* chunk_input) {
     chunk_input->noise_generator->octaves = 8;
     float start_x = chunk_input->position_x * CHUNK_SIZE;
+    float noise;
     for (int x = 0; x < CHUNK_SIZE; x++) {
         float start_y = chunk_input->position_y * CHUNK_SIZE;
         for (int y = 0; y < CHUNK_SIZE; y++) {
-            float noise;
+            if (AIR == chunk_input->blocks[x * CHUNK_SIZE + y]) continue;
             noise = fnlGetNoise2D(chunk_input->noise_generator, (float)x + start_x, (float)y + start_y);
             if (noise > 0.8f) {
                 chunk_input->blocks[x * CHUNK_SIZE + y] = (uint8_t)AIR;
@@ -97,4 +100,18 @@ void destroy_world(struct World* world_input) {
 void destroy_chunk(struct Chunk* chunk_input) {
     UnloadRenderTexture(chunk_input->texture);
     free(chunk_input);
+    --Chunks_Amount;
+}
+
+void eat_fifo(struct FifoWorldGen* fifo_world_gen, struct World* world, int amount) {
+    for (int i = 0; i < amount; i++) {
+        if (fifo_world_gen->start == fifo_world_gen->end) return;        
+        struct Chunk* chunk = create_chunk(fifo_world_gen->x[fifo_world_gen->start], fifo_world_gen->y[fifo_world_gen->start], &world->noise_generator);
+        store_chunk(chunk, world->chunks);
+            
+        chunk_generate_base(chunk);
+        chunk_generate_caves(chunk);
+        generate_chunk_texture_render(chunk);
+        fifo_world_gen->start = (fifo_world_gen->start + 1) & (FIFO_WORLD_GEN_SIZE - 1);
+    }
 }

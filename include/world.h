@@ -36,5 +36,6 @@ _Bool generate_next(struct Chunk*);
 struct World* create_world(int);
 void destroy_world(struct World*);
 void destroy_chunk(struct Chunk*);
+void eat_fifo(struct FifoWorldGen*, struct World*, int);
 
 #endif // WORLD_H

@@ -16,6 +16,7 @@ add_executable(my_program
     src/render.c
     src/hash_table.c
     src/noise_init.c
+    src/fifo.c
 )
 
 target_include_directories(my_program PRIVATE 
