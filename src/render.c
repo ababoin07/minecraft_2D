@@ -7,7 +7,7 @@
 
 static int texture_gen_quota = 4;
 
-void render_chunk(float origin_x, float origin_y, struct Chunk* chunk, float zoom) {
+void render_chunk(float origin_x, float origin_y, chunk_t* chunk, float zoom) {
     DrawTexturePro(
         chunk->texture.texture,
         (Rectangle){ 0, 0, chunk->texture.texture.width, chunk->texture.texture.height },
@@ -15,7 +15,7 @@ void render_chunk(float origin_x, float origin_y, struct Chunk* chunk, float zoo
         (Vector2){ 0, 0 }, 0, WHITE
     );
 }
-void generate_chunk_texture_render(struct Chunk* chunk) {
+void generate_chunk_texture_render(chunk_t* chunk) {
     if (!chunk->texture_generated) {
         if (chunk->texture.id == 0) {
             chunk->texture = LoadRenderTexture(16 * CHUNK_SIZE, 16 * CHUNK_SIZE);
@@ -38,7 +38,7 @@ static void render_chunk_placeholder(float origin_x, float origin_y, float zoom)
     DrawRectangle((int)origin_x, (int)origin_y, (int)(CHUNK_SIZE * CHUNK_SIZE * zoom) + 1, (int)(CHUNK_SIZE * CHUNK_SIZE * zoom) + 1, (Color){20, 20, 40, 255});
 }
 
-void render_world(struct World* world, struct CameraImpl camera, int center_x, int center_y, int width, int height) {
+void render_world(world_t* world, camera_impl_t camera, int center_x, int center_y, int width, int height) {
     float scaled_chunk_size = CHUNK_SIZE * camera.zoom;
     
     float half_w = (width / 2.0f) / (camera.zoom * CHUNK_SIZE);
@@ -55,7 +55,7 @@ void render_world(struct World* world, struct CameraImpl camera, int center_x, i
 
     for (int64_t x = min_x; x <= max_x && request_count < 16; x++) {
         for (int64_t y = min_y; y <= max_y && request_count < 16; y++) {
-            struct Chunk* chunk = get_chunk(x, y, world->chunks);
+            chunk_t* chunk = get_chunk(x, y, world->chunks);
             if (NULL == chunk) {
                 int fifo_usage;
                 pthread_mutex_lock(&fifo_world_gen->mutex);
@@ -72,7 +72,7 @@ void render_world(struct World* world, struct CameraImpl camera, int center_x, i
 
     for (int64_t x = min_x; x <= max_x; x++) {
         for (int64_t y = min_y; y <= max_y; y++) {
-            struct Chunk* chunk = get_chunk(x, y, world->chunks);
+            chunk_t* chunk = get_chunk(x, y, world->chunks);
             if (NULL == chunk) {
                 continue;
             }

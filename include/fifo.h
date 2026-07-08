@@ -13,8 +13,8 @@ struct FifoWorldGen {
     pthread_cond_t cond;
 };
 
-struct FifoWorldGen* FIFO_world_gen_create();
-void FIFO_world_gen_destroy(struct FifoWorldGen*);
-void request_gen(int64_t, int64_t, struct FifoWorldGen*);
+fifo_world_gen_t* FIFO_world_gen_create();
+void FIFO_world_gen_destroy(fifo_world_gen_t*);
+void request_gen(int64_t, int64_t, fifo_world_gen_t*);
 
 #endif // FIFO_H

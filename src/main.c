@@ -8,13 +8,13 @@
 #include "destroy_stack.h"
 
 Texture2D Textures_Atlas;
-struct FifoWorldGen* fifo_world_gen;
+fifo_world_gen_t* fifo_world_gen;
 atomic_uint Chunks_Amount;
-struct World* world;
+world_t* world;
 
 int main() {
     float dt = 0.016f;
-    struct CameraImpl camera = {0.0, 0.0, CHUNK_SIZE * 2};
+     camera_impl_t camera = {0.0, 0.0, CHUNK_SIZE * 2};
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
 
@@ -77,7 +77,7 @@ int main() {
             int64_t chunk_x = (int64_t)floor((double)grid_x / CHUNK_SIZE);
             int64_t chunk_y = (int64_t)floor((double)grid_y / CHUNK_SIZE) + 1;
 
-            struct Chunk* chunk_ptr = get_chunk((int64_t)chunk_x, (int64_t)chunk_y, world->chunks);
+            chunk_t* chunk_ptr = get_chunk((int64_t)chunk_x, (int64_t)chunk_y, world->chunks);
             if (NULL != chunk_ptr) {
                     chunk_ptr->blocks[block_idx] = DIRT;
                     BeginTextureMode(chunk_ptr->texture);

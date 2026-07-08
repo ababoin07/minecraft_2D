@@ -1,11 +1,12 @@
 #ifndef WORLD_H
 #define WORLD_H
 
+#include <pthread.h>
+#include <stdbool.h>
+
 #include "includes.h"
 #include "FastNoiseLite.h"
 #include "hash_table.h"
-#include <pthread.h>
-#include <stdbool.h>
 
 enum ChunkGenSteps {
     CHUNK_GEN_UNSTARTED,
@@ -17,7 +18,7 @@ enum ChunkGenSteps {
 };
 
 struct Chunk {
-    enum ChunkGenSteps generation;
+    chunk_gen_steps_t generation;
     uint8_t blocks[CHUNK_SIZE * CHUNK_SIZE];
     int64_t position_x, position_y;
     RenderTexture2D texture;
@@ -29,20 +30,20 @@ struct World {
     char* name;
     int seed;
     fnl_state noise_generator;
-    struct HashTable* chunks;
+    hash_table_t* chunks;
     pthread_t worker_thread;
     volatile bool worker_running;
 };
 
 void sanitize_filename(char*);
-struct Chunk* create_chunk(int64_t, int64_t, fnl_state*);
-void chunk_generate_base(struct Chunk*);
-void chunk_generate_caves(struct Chunk*);
-_Bool generate_next(struct Chunk*);
-struct World* create_world(int, char*);
-void destroy_world(struct World*);
-void destroy_chunk(struct Chunk*);
-void save_chunk(struct Chunk*);
-struct Chunk* load_chunk(struct World*, int64_t, int64_t);
+chunk_t* create_chunk(int64_t, int64_t, fnl_state*);
+void chunk_generate_base(chunk_t*);
+void chunk_generate_caves(chunk_t*);
+_Bool generate_next(chunk_t*);
+world_t* create_world(int, char*);
+void destroy_world(world_t*);
+void destroy_chunk(chunk_t*);
+void save_chunk(chunk_t*);
+chunk_t* load_chunk(world_t*, int64_t, int64_t);
 
 #endif // WORLD_H

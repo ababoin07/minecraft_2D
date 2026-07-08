@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 
+#include "types.h"
 #include "files_api.h"
 #include "global.h"
 #include "config.h"

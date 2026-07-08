@@ -2,8 +2,8 @@
 #include "fifo.h"
 #include "world.h"
 
-struct FifoWorldGen* FIFO_world_gen_create() {
-    struct FifoWorldGen* ptr = malloc(sizeof(struct FifoWorldGen));
+fifo_world_gen_t* FIFO_world_gen_create() {
+    fifo_world_gen_t* ptr = malloc(sizeof(fifo_world_gen_t));
     if (NULL == ptr) return NULL;
     ptr->start = 0;
     ptr->end = 0;
@@ -13,13 +13,13 @@ struct FifoWorldGen* FIFO_world_gen_create() {
     return ptr;
 }
 
-void FIFO_world_gen_destroy(struct FifoWorldGen* ptr) {
+void FIFO_world_gen_destroy(fifo_world_gen_t* ptr) {
     pthread_mutex_destroy(&ptr->mutex);
     pthread_cond_destroy(&ptr->cond);
     free(ptr);
 }
 
-void request_gen(int64_t x, int64_t y, struct FifoWorldGen* fifo) {
+void request_gen(int64_t x, int64_t y, fifo_world_gen_t* fifo) {
     pthread_mutex_lock(&fifo->mutex);
     uint32_t tmp = fifo->start;
     while (tmp != fifo->end) {

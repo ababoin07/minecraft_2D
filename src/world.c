@@ -17,41 +17,35 @@ void sanitize_filename(char* path) {
     }
 }
 
-static void build_chunk_path(const struct World* world, int64_t cx, int64_t cy, char* out_path, size_t out_size) {
+static void build_chunk_path(const world_t* world, int64_t cx, int64_t cy, char* out_path, size_t out_size) {
     int rx = (int)(cx / 32);
     int ry = (int)(cy / 32);
-    snprintf(out_path, out_size, "worlds/%s/region_%d_%d/chunk_%" PRId64 "_%" PRId64 ".dat",
-             world->name, rx, ry, cx, cy);
+    snprintf(out_path, out_size, "worlds/%s/region_%d_%d/chunk_%" PRId64 "_%" PRId64 ".dat", world->name, rx, ry, cx, cy);
     sanitize_filename(out_path);
 }
 
-struct Chunk* load_chunk(struct World* world, int64_t cx, int64_t cy) {
+chunk_t* load_chunk(world_t* world, int64_t cx, int64_t cy) {
     char path[512];
     build_chunk_path(world, cx, cy, path, sizeof(path));
 
     FILE* f = fopen(path, "rb");
     if (!f) return NULL;
 
-    // Read header
     uint32_t magic, version;
     int64_t pos_x, pos_y;
     uint8_t generation;
-    if (fread(&magic, sizeof(magic), 1, f) != 1 ||
-        fread(&version, sizeof(version), 1, f) != 1 ||
-        fread(&pos_x, sizeof(pos_x), 1, f) != 1 ||
-        fread(&pos_y, sizeof(pos_y), 1, f) != 1 ||
-        fread(&generation, sizeof(generation), 1, f) != 1) {
+    if (fread(&magic, sizeof(magic), 1, f) != 1 || fread(&version, sizeof(version), 1, f) != 1 || fread(&pos_x, sizeof(pos_x), 1, f) != 1 || fread(&pos_y, sizeof(pos_y), 1, f) != 1 || fread(&generation, sizeof(generation), 1, f) != 1) {
         fclose(f);
         return NULL;
     }
 
-    const uint32_t EXPECTED_MAGIC = 0x43484B; // 'CHK'
+    const uint32_t EXPECTED_MAGIC = 0x43484B;
     if (magic != EXPECTED_MAGIC || version != 1 || pos_x != cx || pos_y != cy) {
         fclose(f);
         return NULL;
     }
 
-    struct Chunk* chunk = malloc(sizeof(struct Chunk));
+    chunk_t* chunk = malloc(sizeof(chunk_t));
     if (!chunk) { fclose(f); return NULL; }
 
     if (fread(chunk->blocks, sizeof(chunk->blocks), 1, f) != 1) {
@@ -63,7 +57,7 @@ struct Chunk* load_chunk(struct World* world, int64_t cx, int64_t cy) {
 
     chunk->position_x = cx;
     chunk->position_y = cy;
-    chunk->generation = (enum ChunkGenSteps)generation;
+    chunk->generation = (chunk_gen_steps_t)generation;
     chunk->texture = (RenderTexture2D){0};
     chunk->texture_generated = false;
     chunk->noise_generator = &world->noise_generator;
@@ -72,8 +66,8 @@ struct Chunk* load_chunk(struct World* world, int64_t cx, int64_t cy) {
     return chunk;
 }
 static void* worker_main(void* arg) {
-    struct World* world = (struct World*)arg;
-    extern struct FifoWorldGen* fifo_world_gen;
+    world_t* world = (world_t*)arg;
+    extern fifo_world_gen_t* fifo_world_gen;
 
     while (world->worker_running) {
         pthread_mutex_lock(&fifo_world_gen->mutex);
@@ -89,7 +83,7 @@ static void* worker_main(void* arg) {
         fifo_world_gen->start = (fifo_world_gen->start + 1) & (FIFO_WORLD_GEN_SIZE - 1);
         pthread_mutex_unlock(&fifo_world_gen->mutex);
 
-        struct Chunk* chunk = load_chunk(world, x, y);
+        chunk_t* chunk = load_chunk(world, x, y);
         if (!chunk) {
             chunk = create_chunk(x, y, &world->noise_generator);
             chunk_generate_base(chunk);
@@ -102,8 +96,8 @@ static void* worker_main(void* arg) {
     return NULL;
 }
 
-struct World* create_world(int seed, char* name) {
-    struct World* ptr = malloc(sizeof(struct World));
+world_t* create_world(int seed, char* name) {
+    world_t* ptr = malloc(sizeof(world_t));
     if (NULL == ptr) return NULL;
     if (!directory_exists("worlds")) MKDIR("worlds");
     char path[256];
@@ -119,7 +113,7 @@ struct World* create_world(int seed, char* name) {
 
     for (int64_t x = -HALF_INITIAL_WORLD_SIZE; x < HALF_INITIAL_WORLD_SIZE; x++) {
         for (int64_t y = -HALF_INITIAL_WORLD_SIZE; y < HALF_INITIAL_WORLD_SIZE; y++) {
-            struct Chunk* chunk = load_chunk(ptr, x, y);
+            chunk_t* chunk = load_chunk(ptr, x, y);
             if (!chunk) {
                 chunk = create_chunk(x, y, &ptr->noise_generator);
                 chunk_generate_base(chunk);
@@ -134,8 +128,8 @@ struct World* create_world(int seed, char* name) {
     return ptr;
 }
 
-struct Chunk* create_chunk(int64_t offset_x, int64_t offset_y, fnl_state* noise_generator) {
-    struct Chunk* ptr = malloc(sizeof(struct Chunk));
+chunk_t* create_chunk(int64_t offset_x, int64_t offset_y, fnl_state* noise_generator) {
+    chunk_t* ptr = malloc(sizeof(chunk_t));
     if (NULL == ptr) return NULL;
     for (size_t tmp = 0; tmp < CHUNK_SIZE * CHUNK_SIZE; tmp++) 
         ptr->blocks[tmp] = 0;
@@ -149,7 +143,7 @@ struct Chunk* create_chunk(int64_t offset_x, int64_t offset_y, fnl_state* noise_
     return ptr;
 };
 
-void chunk_generate_base(struct Chunk* chunk_input) {
+void chunk_generate_base(chunk_t* chunk_input) {
     chunk_input->noise_generator->frequency;
     for (int x = 0; x < CHUNK_SIZE; x++) {
         int height_noise = (int)(8 * fnlGetNoise2D(chunk_input->noise_generator, (float)chunk_input->position_x * (float)CHUNK_SIZE + (float)x, 16.f));
@@ -163,7 +157,7 @@ void chunk_generate_base(struct Chunk* chunk_input) {
     chunk_input->generation = CHUNK_GEN_BASE;
 }
 
-void chunk_generate_caves(struct Chunk* chunk_input) {
+void chunk_generate_caves(chunk_t* chunk_input) {
     float start_x = chunk_input->position_x * CHUNK_SIZE;
     float noise;
     for (int x = 0; x < CHUNK_SIZE; x++) {
@@ -190,27 +184,27 @@ void chunk_generate_caves(struct Chunk* chunk_input) {
     chunk_input->generation = CHUNK_GEN_CAVES;
 }
 
-_Bool generate_next(struct Chunk* chunk) {
+_Bool generate_next(chunk_t* chunk) {
     return 1;
 }
 
-void destroy_world(struct World* world_input) {
+void destroy_world(world_t* world_input) {
     world_input->worker_running = false;
-    extern struct FifoWorldGen* fifo_world_gen;
+    extern  fifo_world_gen_t* fifo_world_gen;
     pthread_mutex_lock(&fifo_world_gen->mutex);
     pthread_cond_signal(&fifo_world_gen->cond);
     pthread_mutex_unlock(&fifo_world_gen->mutex);
     pthread_join(world_input->worker_thread, NULL);
 
     for (size_t i = 0; i < HASH_TABLE_BUCKETS * HASH_TABLE_BUCKET_SIZE; i++) {
-        struct Chunk* chunk = world_input->chunks->buckets[i].chunk_ptr;
+        chunk_t* chunk = world_input->chunks->buckets[i].chunk_ptr;
         if (chunk != NULL) {
             save_chunk(chunk);
         }
     }
 
     for (size_t i = 0; i < HASH_TABLE_BUCKETS * HASH_TABLE_BUCKET_SIZE; i++) {
-        struct Chunk* chunk = world_input->chunks->buckets[i].chunk_ptr;
+        chunk_t* chunk = world_input->chunks->buckets[i].chunk_ptr;
         if (chunk != NULL) {
             destroy_chunk(chunk);
         }
@@ -220,7 +214,7 @@ void destroy_world(struct World* world_input) {
     free(world_input);
 }
 
-void destroy_chunk(struct Chunk* chunk_input) {
+void destroy_chunk(chunk_t* chunk_input) {
     if (chunk_input->texture.id != 0) {
         UnloadRenderTexture(chunk_input->texture);
     }
@@ -228,10 +222,10 @@ void destroy_chunk(struct Chunk* chunk_input) {
     atomic_fetch_sub(&Chunks_Amount, 1);
 }
 
-void save_chunk(struct Chunk* chunk_input) {
+void save_chunk(chunk_t* chunk_input) {
     if (!chunk_input) return;
 
-    extern struct World* world;
+    extern world_t* world;
 
     int rx = (int)(chunk_input->position_x / 32);
     int ry = (int)(chunk_input->position_y / 32);
