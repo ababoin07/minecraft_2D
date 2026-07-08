@@ -6,7 +6,8 @@ enum BlockName {
     DIRT,
     GRASS,
     STONE,
-    BEDROCK
+    BEDROCK,
+    WATER_STAND
 };
 
 #endif // DATA_H

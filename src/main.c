@@ -5,10 +5,12 @@
 #include "camera.h"
 #include "render.h"
 #include "fifo.h"
+#include "destroy_stack.h"
 
 Texture2D Textures_Atlas;
 struct FifoWorldGen* fifo_world_gen;
-uint32_t Chunks_Amount;
+atomic_uint Chunks_Amount;
+struct World* world;
 
 int main() {
     float dt = 0.016f;
@@ -19,6 +21,8 @@ int main() {
     SetTraceLogLevel(LOG_WARNING);
 
     InitWindow(800, 600, "Minecraft 2D");
+    init_destroy_stack();
+
     SetWindowMinSize(800, 600);
 
     Textures_Atlas = LoadTexture("assets/textures/blocks_texture.png");
@@ -27,7 +31,7 @@ int main() {
 
     Chunks_Amount = 0;
 
-    struct World* world = create_world(42);
+    world = create_world(42, "test-world");
 
     while (!WindowShouldClose()) {
         BeginDrawing();
@@ -38,8 +42,8 @@ int main() {
         int screen_center_x = screen_width / 2;
         int screen_center_y = screen_height / 2;
 
-        camera.x += ((IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) - (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT))) * dt * 16 / camera.zoom;
-        camera.y += ((IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) - (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN))) * dt * 16 / camera.zoom;
+        camera.x += ((IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) - (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT))) * dt * 64 / camera.zoom;
+        camera.y += ((IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) - (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN))) * dt * 64 / camera.zoom;
         _Bool key_pressed_q = IsKeyDown(KEY_Q);
         _Bool key_pressed_e = IsKeyDown(KEY_E);
         float factor = key_pressed_e == key_pressed_q ? 1 : (key_pressed_q ? 0.5f : 2.f);
@@ -84,13 +88,15 @@ int main() {
 
         DrawTexturePro(cursor_texture, (Rectangle){0, 0, 16, 16}, (Rectangle){draw_x, draw_y, camera.zoom, camera.zoom}, (Vector2){0, 0}, 0, WHITE);
         EndDrawing();
-        eat_fifo(fifo_world_gen, world, 8);
+        process_destroy_stack();
         dt = GetFrameTime();
     }
 
     destroy_world(world);
 
     UnloadTexture(Textures_Atlas);
+    process_destroy_stack();
+    destroy_destroy_stack();
     CloseWindow(); 
     
     return 0;

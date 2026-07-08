@@ -9,7 +9,10 @@
 #include <raylib.h>
 #include <inttypes.h>
 #include <string.h>
+#include <pthread.h>
+#include <stdbool.h>
 
+#include "files_api.h"
 #include "global.h"
 #include "config.h"
 #include "math_utilities.h"

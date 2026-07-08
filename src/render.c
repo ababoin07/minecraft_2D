@@ -2,46 +2,40 @@
 #include "world.h"
 #include "camera.h"
 #include "fifo.h"
-
 #include "render.h"
+#include <stdatomic.h>
 
-#if OLD_RENDERER == 0
+static int texture_gen_quota = 4;
+
 void render_chunk(float origin_x, float origin_y, struct Chunk* chunk, float zoom) {
     DrawTexturePro(
         chunk->texture.texture,
         (Rectangle){ 0, 0, chunk->texture.texture.width, chunk->texture.texture.height },
-        (Rectangle){ origin_x, origin_y, CHUNK_SIZE * 16 * zoom, CHUNK_SIZE * 16 * zoom },
+        (Rectangle){ origin_x, origin_y, CHUNK_SIZE * CHUNK_SIZE * zoom, CHUNK_SIZE * CHUNK_SIZE * zoom },
         (Vector2){ 0, 0 }, 0, WHITE
     );
 }
-#else
-void render_chunk(float origin_x, float origin_y, struct Chunk* chunk, float zoom) {
-    Vector2 origin = {0, 0};
-    float zoom_times_16 = zoom * 16;
-    for (int x = 0; x < CHUNK_SIZE; x++) {
-        for (int y = 0; y < CHUNK_SIZE; y++) {
-            DrawTexturePro(Textures_Atlas, (Rectangle){chunk->blocks[y + x * CHUNK_SIZE] * 16, 0, 16, 16}, (Rectangle){origin_x + x * zoom_times_16, origin_y + (CHUNK_SIZE - 1 - y) * zoom_times_16, zoom_times_16, zoom_times_16}, (Vector2){0, 0}, 0, WHITE);
-        }
-    }
-    char buffer[64];
-    snprintf(buffer, sizeof(buffer), "(%" PRId64 ", %" PRId64")", chunk->position_x, chunk->position_y);
-    DrawText(buffer, (int)origin_x, (int)origin_y, (int)30 * zoom, RED);
-}
-#endif
-
-
 void generate_chunk_texture_render(struct Chunk* chunk) {
-    BeginTextureMode(chunk->texture);
-        ClearBackground(BLANK);
-        
-        for (int x = 0; x < CHUNK_SIZE; x++) {
-            for (int y = 0; y < CHUNK_SIZE; y++) {
-                int block_id = chunk->blocks[y + x * CHUNK_SIZE];
-                
-                DrawTexturePro(Textures_Atlas, (Rectangle){block_id * 16, 16, 16, -16}, (Rectangle){x * 16, y * 16, 16, 16}, (Vector2){0, 0}, 0, WHITE);
-            }
+    if (!chunk->texture_generated) {
+        if (chunk->texture.id == 0) {
+            chunk->texture = LoadRenderTexture(16 * CHUNK_SIZE, 16 * CHUNK_SIZE);
+            if (chunk->texture.id == 0) return;
         }
-    EndTextureMode();
+        BeginTextureMode(chunk->texture);
+            ClearBackground(BLANK);
+            for (int x = 0; x < CHUNK_SIZE; x++) {
+                for (int y = 0; y < CHUNK_SIZE; y++) {
+                    int block_id = chunk->blocks[y + x * CHUNK_SIZE];
+                    DrawTexturePro(Textures_Atlas, (Rectangle){block_id * 16, 16, 16, -16}, (Rectangle){x * 16, y * 16, 16, 16}, (Vector2){0, 0}, 0, WHITE);
+                }
+            }
+        EndTextureMode();
+        chunk->texture_generated = true;
+    }
+}
+
+static void render_chunk_placeholder(float origin_x, float origin_y, float zoom) {
+    DrawRectangle((int)origin_x, (int)origin_y, (int)(CHUNK_SIZE * CHUNK_SIZE * zoom) + 1, (int)(CHUNK_SIZE * CHUNK_SIZE * zoom) + 1, (Color){20, 20, 40, 255});
 }
 
 void render_world(struct World* world, struct CameraImpl camera, int center_x, int center_y, int width, int height) {
@@ -56,13 +50,36 @@ void render_world(struct World* world, struct CameraImpl camera, int center_x, i
     int64_t max_y = (int64_t)ceilf(camera.y + half_h);
 
     size_t counter_temporary = 0;
+    int request_count = 0;
+    int texture_gen_count = 0;
+
+    for (int64_t x = min_x; x <= max_x && request_count < 16; x++) {
+        for (int64_t y = min_y; y <= max_y && request_count < 16; y++) {
+            struct Chunk* chunk = get_chunk(x, y, world->chunks);
+            if (NULL == chunk) {
+                int fifo_usage;
+                pthread_mutex_lock(&fifo_world_gen->mutex);
+                fifo_usage = fifo_world_gen->end - fifo_world_gen->start;
+                if (fifo_usage < 0) fifo_usage += FIFO_WORLD_GEN_SIZE;
+                pthread_mutex_unlock(&fifo_world_gen->mutex);
+                if (fifo_usage < FIFO_WORLD_GEN_SIZE - 8) {
+                    request_gen(x, y, fifo_world_gen);
+                    request_count++;
+                }
+            }
+        }
+    }
 
     for (int64_t x = min_x; x <= max_x; x++) {
         for (int64_t y = min_y; y <= max_y; y++) {
             struct Chunk* chunk = get_chunk(x, y, world->chunks);
             if (NULL == chunk) {
-                request_gen(x, y, fifo_world_gen);
                 continue;
+            }
+
+            if (!chunk->texture_generated && texture_gen_count < texture_gen_quota) {
+                generate_chunk_texture_render(chunk);
+                texture_gen_count++;
             }
 
             float screen_x = (chunk->position_x - camera.x) * camera.zoom * CHUNK_SIZE + center_x;
@@ -75,7 +92,11 @@ void render_world(struct World* world, struct CameraImpl camera, int center_x, i
                 continue;
             }
 
-            render_chunk(screen_x, screen_y, chunk, camera.zoom / CHUNK_SIZE);
+            if (chunk->texture_generated) {
+                render_chunk(screen_x, screen_y, chunk, camera.zoom / CHUNK_SIZE);
+            } else {
+                render_chunk_placeholder(screen_x, screen_y, camera.zoom / CHUNK_SIZE);
+            }
             ++counter_temporary;
         }
     }
@@ -84,10 +105,16 @@ void render_world(struct World* world, struct CameraImpl camera, int center_x, i
     snprintf(buffer, sizeof(buffer), "Drawn chunks: %zu", counter_temporary);
     DrawText(buffer, 0, 0, 20, DARKBLUE);
     DrawFPS(0, 25);
-    int amount = fifo_world_gen->end - fifo_world_gen->start;
+
+    int amount = 0;
+    pthread_mutex_lock(&fifo_world_gen->mutex);
+    amount = fifo_world_gen->end - fifo_world_gen->start;
     if (amount < 0) amount += FIFO_WORLD_GEN_SIZE;
+    pthread_mutex_unlock(&fifo_world_gen->mutex);
     snprintf(buffer, sizeof(buffer), "Waiting chunks amount: %i", amount);
     DrawText(buffer, 0, 50, 20, BLUE);
-    snprintf(buffer, sizeof(buffer), "Chunks amount: %" PRIu32, Chunks_Amount);
+
+    uint32_t chunks_total = atomic_load(&Chunks_Amount);
+    snprintf(buffer, sizeof(buffer), "Chunks amount: %" PRIu32, chunks_total);
     DrawText(buffer, 0, 75, 20, RED);
-} 
+}

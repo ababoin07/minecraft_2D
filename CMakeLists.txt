@@ -9,6 +9,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(raylib)
 
 project(MyProject C)
+# add_compile_options(-g -O2)
 
 add_executable(my_program 
 	src/main.c
@@ -17,6 +18,8 @@ add_executable(my_program
     src/hash_table.c
     src/noise_init.c
     src/fifo.c
+    src/files_api.c
+    src/destroy_stack.c
 )
 
 target_include_directories(my_program PRIVATE 
