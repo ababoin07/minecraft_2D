@@ -1,5 +1,5 @@
 #ifndef TYPES_H
-#define TYPE_H
+#define TYPES_H
 
 // struct Chunk
 struct Chunk;
@@ -38,4 +38,4 @@ struct CameraImpl;
 typedef struct CameraImpl camera_impl_t;
 
 
-#endif TYPES_H // TYPES_H
+#endif // TYPES_H
