@@ -3,8 +3,13 @@
 
 #include "includes.h"
 
-struct CameraImpl {
-    double x, y, zoom;
+/**
+ * @brief Camera state: position and zoom level.
+ */
+struct CameraImpl
+{
+    double x, y;   /**< World coordinates (in chunks) of the camera centre. */
+    double zoom;   /**< Zoom factor (pixels per block). */
 };
 
 #endif // CAMERA_H
