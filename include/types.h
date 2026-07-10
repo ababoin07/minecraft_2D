@@ -1,6 +1,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+void MINECRAFT_2D_CRITICAL_ERROR(char*);
+
 // struct Chunk
 struct Chunk;
 typedef struct Chunk chunk_t;
@@ -37,5 +39,8 @@ typedef struct HashTable hash_table_t;
 struct CameraImpl;
 typedef struct CameraImpl camera_impl_t;
 
+// struct LightUpdateSlot
+struct LightUpdateSlot;
+typedef struct LightUpdateSlot light_update_slot_t;
 
 #endif // TYPES_H

@@ -7,6 +7,13 @@
 #include "fifo.h"
 #include "destroy_stack.h"
 
+void MINECRAFT_2D_CRITICAL_ERROR(char* error) {
+    printf("\nCritical error: %s", error);
+    fflush(stdout);
+    exit(-1);
+}
+
+
 Texture2D Textures_Atlas;
 fifo_world_gen_t* fifo_world_gen;
 atomic_uint Chunks_Amount;
@@ -83,12 +90,16 @@ int main() {
                     BeginTextureMode(chunk_ptr->texture);
                         DrawTexturePro(Textures_Atlas, (Rectangle){DIRT * 16, 16, 16, -16}, (Rectangle){local_x * 16, local_y * 16, 16, 16}, (Vector2){0, 0}, 0, WHITE);
                     EndTextureMode();
+                    chunk_ptr->is_source[block_idx] = true;
+                    register_light_source(chunk_x, chunk_y, block_idx, true, true, true, true, 255, 255, 255);
+
             }
         }
 
         DrawTexturePro(cursor_texture, (Rectangle){0, 0, 16, 16}, (Rectangle){draw_x, draw_y, camera.zoom, camera.zoom}, (Vector2){0, 0}, 0, WHITE);
         EndDrawing();
         process_destroy_stack();
+        process_light_sources(200);
         dt = GetFrameTime();
     }
 

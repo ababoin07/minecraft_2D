@@ -7,7 +7,8 @@
 
 static int texture_gen_quota = 4;
 
-void render_chunk(float origin_x, float origin_y, chunk_t* chunk, float zoom) {
+#if OLD_RENDERER == 0
+void render_chunk(float origin_x, float origin_y, struct Chunk* chunk, float zoom) {
     DrawTexturePro(
         chunk->texture.texture,
         (Rectangle){ 0, 0, chunk->texture.texture.width, chunk->texture.texture.height },
@@ -15,6 +16,21 @@ void render_chunk(float origin_x, float origin_y, chunk_t* chunk, float zoom) {
         (Vector2){ 0, 0 }, 0, WHITE
     );
 }
+#else
+void render_chunk(float origin_x, float origin_y, struct Chunk* chunk, float zoom) {
+    Vector2 origin = {0, 0};
+    float zoom_times_16 = zoom * 16;
+    for (int x = 0; x < CHUNK_SIZE; x++) {
+        for (int y = 0; y < CHUNK_SIZE; y++) {
+            DrawTexturePro(Textures_Atlas, (Rectangle){chunk->blocks[y + x * CHUNK_SIZE] * 16, 0, 16, 16}, (Rectangle){origin_x + x * zoom_times_16, origin_y + (CHUNK_SIZE - 1 - y) * zoom_times_16, zoom_times_16, zoom_times_16}, (Vector2){0, 0}, 0, (Color){chunk->light_r[y + x * CHUNK_SIZE], chunk->light_g[y + x * CHUNK_SIZE], chunk->light_b[y + x * CHUNK_SIZE], 255});
+        }
+    }
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "(%" PRId64 ", %" PRId64")", chunk->position_x, chunk->position_y);
+    //DrawText(buffer, (int)origin_x, (int)origin_y, (int)30 * zoom, RED);
+}
+#endif
+
 void generate_chunk_texture_render(chunk_t* chunk) {
     if (!chunk->texture_generated) {
         if (chunk->texture.id == 0) {
@@ -25,8 +41,9 @@ void generate_chunk_texture_render(chunk_t* chunk) {
             ClearBackground(BLANK);
             for (int x = 0; x < CHUNK_SIZE; x++) {
                 for (int y = 0; y < CHUNK_SIZE; y++) {
-                    int block_id = chunk->blocks[y + x * CHUNK_SIZE];
-                    DrawTexturePro(Textures_Atlas, (Rectangle){block_id * 16, 16, 16, -16}, (Rectangle){x * 16, y * 16, 16, 16}, (Vector2){0, 0}, 0, WHITE);
+                    int block_idx = y + x * CHUNK_SIZE;
+                    int block_id = chunk->blocks[block_idx];
+                    DrawTexturePro(Textures_Atlas, (Rectangle){block_id * 16, 16, 16, -16}, (Rectangle){x * 16, y * 16, 16, 16}, (Vector2){0, 0}, 0, (Color){chunk->light_r[block_idx], chunk->light_g[block_idx], chunk->light_b[block_idx], 255});
                 }
             }
         EndTextureMode();
